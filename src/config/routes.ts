@@ -9,5 +9,5 @@ export enum routes {
 }
 
 export const homepageUrl = new URL(
-  import.meta.env.VITE_HOMEPAGE ?? 'https://chitchatter.im/'
+  'https://ghostway0.github.io/chitchatter/',
 )
