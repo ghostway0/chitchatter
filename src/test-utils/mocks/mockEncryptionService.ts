@@ -3,7 +3,7 @@ import { encryption } from 'services/Encryption'
 
 export const mockEncryptionService = encryption
 
-mockEncryptionService.generateKeyPair = vi.fn(async () => ({
+mockEncryptionService.generateKeyPair = vi.fn(() => ({
   publicKey: encryption.cryptoKeyStub,
   privateKey: encryption.cryptoKeyStub,
 }))

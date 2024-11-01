@@ -42,9 +42,9 @@ export class SerializationService {
       ...userSettingsRest
     } = userSettings
 
-    const publicKey = await encryption.stringifyCryptoKey(publicCryptoKey)
+    const publicKey = encryption.stringifyCryptoKey(publicCryptoKey)
 
-    const privateKey = await encryption.stringifyCryptoKey(privateCryptoKey)
+    const privateKey = encryption.stringifyCryptoKey(privateCryptoKey)
 
     return {
       ...userSettingsRest,
@@ -62,11 +62,11 @@ export class SerializationService {
       ...userSettingsForIndexedDbRest
     } = serializedUserSettings
 
-    const publicKey = await encryption.parseCryptoKeyString(
+    const publicKey = encryption.parseCryptoKeyString(
       publicCryptoKeyString,
       AllowedKeyType.PUBLIC
     )
-    const privateKey = await encryption.parseCryptoKeyString(
+    const privateKey = encryption.parseCryptoKeyString(
       privateCryptoKeyString,
       AllowedKeyType.PRIVATE
     )

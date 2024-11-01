@@ -31,7 +31,7 @@ export function PrivateRoom({ userId }: PublicRoomProps) {
 
   const handlePasswordEntered = async (password: string) => {
     if (password.length !== 0)
-      setSecret(await encryption.encodePassword(roomId, password))
+      setSecret(encryption.encodePassword(roomId, password))
   }
 
   if (urlParams.has('pwd') && !urlParams.has('secret'))

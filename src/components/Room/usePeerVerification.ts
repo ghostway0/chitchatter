@@ -32,7 +32,8 @@ export const usePeerVerification = ({
     async (peer: Peer) => {
       const { verificationToken } = peer
 
-      const encryptedVerificationToken = await encryptionService.encryptString(
+      const encryptedVerificationToken = encryptionService.encryptString(
+        privateKey,
         peer.publicKey,
         verificationToken
       )
@@ -65,6 +66,7 @@ export const usePeerVerification = ({
       sendVerificationTokenEncrypted,
       showAlert,
       updatePeer,
+      privateKey,
     ]
   )
 
@@ -90,11 +92,11 @@ export const usePeerVerification = ({
   receiveVerificationTokenEncrypted(
     async (encryptedVerificationToken, peerId) => {
       try {
-        const decryptedVerificationToken =
-          await encryptionService.decryptString(
-            privateKey,
-            encryptedVerificationToken
-          )
+        const decryptedVerificationToken = encryptionService.decryptString(
+          privateKey,
+          peerList.find(peer => peer.peerId === peerId)?.publicKey,
+          encryptedVerificationToken
+        )
 
         await sendVerificationTokenRaw(decryptedVerificationToken, [peerId])
       } catch (e) {

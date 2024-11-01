@@ -13,7 +13,7 @@ export const PublicKey = ({ publicKey }: PeerPublicKeyProps) => {
 
   useEffect(() => {
     ;(async () => {
-      setPublicKeyString(await encryption.stringifyCryptoKey(publicKey))
+      setPublicKeyString(encryption.stringifyCryptoKey(publicKey))
     })()
   }, [publicKey])
 

@@ -51,7 +51,7 @@ export function RoomShareDialog(props: RoomShareDialogProps) {
   const url = window.location.href.split('#')[0]
 
   const copyWithPass = async () => {
-    const encoded = await encryption.encodePassword(props.roomId, password)
+    const encoded = encryption.encodePassword(props.roomId, password)
 
     if (encoded === props.password) {
       const params = new URLSearchParams()

@@ -31,7 +31,7 @@ const Init = ({ getUuid = uuid, ...props }: InitProps) => {
       if (userSettings !== null) return
 
       try {
-        const { publicKey, privateKey } = await encryption.generateKeyPair()
+        const { publicKey, privateKey } = encryption.generateKeyPair()
 
         setUserSettings({
           userId: getUuid(),
