@@ -8,6 +8,4 @@ export enum routes {
   SETTINGS = '/settings',
 }
 
-export const homepageUrl = new URL(
-  'https://ghostway0.github.io/chitchatter/',
-)
+export const homepageUrl = new URL('https://ghostway0.github.io/chitchatter/')

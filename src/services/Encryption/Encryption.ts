@@ -1,112 +1,77 @@
-// NOTE: Much of what's here is derived from various ChatGPT responses:
-//
-//  - https://gist.github.com/jeremyckahn/cbb6107e7de6c83b620960a19266055e
-//  - https://gist.github.com/jeremyckahn/c49ca17a849ecf35c5f957ffde956cf4
+import * as sodium from 'libsodium-wrappers'
 
 export enum AllowedKeyType {
   PUBLIC,
   PRIVATE,
 }
 
-const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-  const binary = String.fromCharCode(...new Uint8Array(buffer))
-  return btoa(binary)
+type KeyPair = {
+  publicKey: Uint8Array
+  privateKey: Uint8Array
 }
-
-const base64ToArrayBuffer = (base64: string) => {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-
-  return bytes.buffer
-}
-
-const algorithmName = 'RSA-OAEP'
-
-const algorithmHash = 'SHA-256'
 
 export class EncryptionService {
-  cryptoKeyStub: CryptoKey = {
-    algorithm: { name: 'STUB-ALGORITHM' },
-    extractable: false,
-    type: 'private',
-    usages: [],
+  private keyPair: sodium.KeyPair | null = null
+
+  async initialize() {
+    await sodium.ready
   }
 
-  // TODO: Make this configurable
-  generateKeyPair = async (): Promise<CryptoKeyPair> => {
-    const keyPair = await window.crypto.subtle.generateKey(
-      {
-        name: algorithmName,
-        hash: algorithmHash,
-        modulusLength: 2048,
-        publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-      },
-      true,
-      ['encrypt', 'decrypt']
-    )
-
-    return keyPair
+  generateKeyPair = async (): Promise<KeyPair> => {
+    await this.initialize()
+    this.keyPair = sodium.crypto_kx_keypair()
+    console.log(this.keyPair.publicKey)
+    console.log(this.keyPair.privateKey)
+    return {
+      publicKey: this.keyPair.publicKey,
+      privateKey: this.keyPair.privateKey,
+    }
   }
 
   encodePassword = async (roomId: string, password: string) => {
     const data = new TextEncoder().encode(`${roomId}_${password}`)
-    const digest = await window.crypto.subtle.digest('SHA-256', data)
-    const bytes = new Uint8Array(digest)
-    const encodedPassword = window.btoa(String.fromCharCode(...bytes))
-
-    return encodedPassword
+    const digest = sodium.crypto_generichash(32, data)
+    return sodium.to_base64(digest)
   }
 
-  stringifyCryptoKey = async (cryptoKey: CryptoKey) => {
-    const exportedKey = await window.crypto.subtle.exportKey(
-      cryptoKey.type === 'public' ? 'spki' : 'pkcs8',
-      cryptoKey
-    )
-
-    const exportedKeyAsString = arrayBufferToBase64(exportedKey)
-
-    return exportedKeyAsString
+  stringifyCryptoKey = (cryptoKey: Uint8Array) => {
+    return sodium.to_base64(cryptoKey)
   }
 
-  parseCryptoKeyString = async (keyString: string, type: AllowedKeyType) => {
-    const importedKey = await window.crypto.subtle.importKey(
-      type === AllowedKeyType.PUBLIC ? 'spki' : 'pkcs8',
-      base64ToArrayBuffer(keyString),
-      {
-        name: algorithmName,
-        hash: algorithmHash,
-      },
-      true,
-      type === AllowedKeyType.PUBLIC ? ['encrypt'] : ['decrypt']
-    )
-
-    return importedKey
+  parseCryptoKeyString = (keyString: string) => {
+    return sodium.from_base64(keyString)
   }
 
-  encryptString = async (publicKey: CryptoKey, plaintext: string) => {
-    const encodedText = new TextEncoder().encode(plaintext)
-    const encryptedData = await crypto.subtle.encrypt(
-      algorithmName,
-      publicKey,
-      encodedText
-    )
-
-    return encryptedData
+  encryptString = async (publicKey: Uint8Array, plaintext: string) => {
+    await this.initialize()
+    const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES)
+    const key = sodium.crypto_generichash(32, publicKey)
+    const message = new TextEncoder().encode(plaintext)
+    console.log(message, publicKey, key)
+    const encryptedData = sodium.crypto_secretbox_easy(message, nonce, key)
+    return { encryptedData, nonce }
   }
 
-  decryptString = async (privateKey: CryptoKey, encryptedData: ArrayBuffer) => {
-    const decryptedArrayBuffer = await crypto.subtle.decrypt(
-      algorithmName,
-      privateKey,
-      encryptedData
+  decryptString = async (
+    privateKey: Uint8Array,
+    encryptedDataBase64: string,
+    nonceBase64: string
+  ) => {
+    await this.sodiumReady
+
+    const encryptedData = sodium.from_base64(encryptedDataBase64)
+    const nonce = sodium.from_base64(nonceBase64)
+
+    const key = sodium.crypto_generichash(32, privateKey)
+
+    const decrypted = sodium.crypto_secretbox_open_easy(
+      encryptedData,
+      nonce,
+      key
     )
 
-    const decryptedString = new TextDecoder().decode(decryptedArrayBuffer)
-
-    return decryptedString
+    if (!decrypted) throw new Error('Decryption failed')
+    return new TextDecoder().decode(decrypted)
   }
 }
 
