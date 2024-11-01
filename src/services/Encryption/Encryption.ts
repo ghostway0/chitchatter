@@ -5,73 +5,75 @@ export enum AllowedKeyType {
   PRIVATE,
 }
 
-type KeyPair = {
-  publicKey: Uint8Array
-  privateKey: Uint8Array
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  const binary = String.fromCharCode(...new Uint8Array(buffer))
+  return btoa(binary)
+}
+
+const base64ToArrayBuffer = (base64: string) => {
+  const binaryString = atob(base64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+  return bytes.buffer
 }
 
 export class EncryptionService {
-  private keyPair: sodium.KeyPair | null = null
+  cryptoKeyStub: CryptoKey = {
+    algorithm: { name: 'STUB-ALGORITHM' },
+    extractable: false,
+    type: 'private',
+    usages: [],
+  }
 
-  async initialize() {
+  async init() {
     await sodium.ready
   }
 
-  generateKeyPair = async (): Promise<KeyPair> => {
-    await this.initialize()
-    this.keyPair = sodium.crypto_kx_keypair()
-    console.log(this.keyPair.publicKey)
-    console.log(this.keyPair.privateKey)
+  generateKeyPair = async (): Promise<CryptoKeyPair> => {
+    const keyPair = sodium.crypto_kx_keypair()
     return {
-      publicKey: this.keyPair.publicKey,
-      privateKey: this.keyPair.privateKey,
+      publicKey: keyPair.publicKey.buffer as CryptoKey,
+      privateKey: keyPair.privateKey.buffer as CryptoKey,
     }
   }
 
   encodePassword = async (roomId: string, password: string) => {
     const data = new TextEncoder().encode(`${roomId}_${password}`)
-    const digest = sodium.crypto_generichash(32, data)
-    return sodium.to_base64(digest)
+    const hash = sodium.crypto_generichash(32, data)
+    return arrayBufferToBase64(hash.buffer)
   }
 
-  stringifyCryptoKey = (cryptoKey: Uint8Array) => {
-    return sodium.to_base64(cryptoKey)
+  stringifyCryptoKey = async (cryptoKey: CryptoKey) => {
+    const keyData = cryptoKey as ArrayBuffer
+    return arrayBufferToBase64(keyData)
   }
 
-  parseCryptoKeyString = (keyString: string) => {
-    return sodium.from_base64(keyString)
+  parseCryptoKeyString = async (keyString: string, type: AllowedKeyType) => {
+    const keyArray = base64ToArrayBuffer(keyString)
+    return type === AllowedKeyType.PUBLIC
+      ? { publicKey: keyArray as CryptoKey }
+      : { privateKey: keyArray as CryptoKey }
   }
 
-  encryptString = async (publicKey: Uint8Array, plaintext: string) => {
-    await this.initialize()
+  encryptString = async (publicKey: CryptoKey, plaintext: string) => {
     const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES)
-    const key = sodium.crypto_generichash(32, publicKey)
+    const key = new Uint8Array(publicKey as ArrayBuffer)
     const message = new TextEncoder().encode(plaintext)
-    console.log(message, publicKey, key)
     const encryptedData = sodium.crypto_secretbox_easy(message, nonce, key)
-    return { encryptedData, nonce }
+    return encryptedData.buffer
   }
 
-  decryptString = async (
-    privateKey: Uint8Array,
-    encryptedDataBase64: string,
-    nonceBase64: string
-  ) => {
-    await this.sodiumReady
-
-    const encryptedData = sodium.from_base64(encryptedDataBase64)
-    const nonce = sodium.from_base64(nonceBase64)
-
-    const key = sodium.crypto_generichash(32, privateKey)
-
-    const decrypted = sodium.crypto_secretbox_open_easy(
-      encryptedData,
+  decryptString = async (privateKey: CryptoKey, encryptedData: ArrayBuffer) => {
+    const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES)
+    const key = new Uint8Array(privateKey as ArrayBuffer)
+    const decryptedData = sodium.crypto_secretbox_open_easy(
+      new Uint8Array(encryptedData),
       nonce,
       key
     )
-
-    if (!decrypted) throw new Error('Decryption failed')
-    return new TextDecoder().decode(decrypted)
+    return new TextDecoder().decode(decryptedData)
   }
 }
 
